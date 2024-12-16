@@ -23,6 +23,7 @@ class VideoPlayerView: UIView {
     var statusObserver: NSKeyValueObservation?
     
     var progress: Float
+    var oldProgress: Float
 
     lazy var displayLink: CADisplayLink = CADisplayLink(target: self, selector: #selector(displayLinkFired(link:)))
 
@@ -37,6 +38,7 @@ class VideoPlayerView: UIView {
 
     init(url: URL, progress: Double) {
         self.progress = Float(progress)
+        self.oldProgress = Float(progress)
         let videoItem = AVPlayerItem(url: url)
         self.player = AVPlayer(playerItem: videoItem)
         let device = MTLCreateSystemDefaultDevice()!
@@ -58,20 +60,21 @@ class VideoPlayerView: UIView {
     }
     
     @objc func displayLinkFired(link: CADisplayLink) {
-      let currentTime = playerItemVideoOutput.itemTime(forHostTime: CACurrentMediaTime())
-      if playerItemVideoOutput.hasNewPixelBuffer(forItemTime: currentTime) {
-        if let buffer = playerItemVideoOutput.copyPixelBuffer(forItemTime: currentTime, itemTimeForDisplay: nil) {
-          let frameImage = CIImage(cvImageBuffer: buffer)
-
-          let pixelate = CIFilter(name: "CIPixellate")!
-          pixelate.setValue(frameImage, forKey: kCIInputImageKey)
-            pixelate.setValue(progress, forKey: kCIInputScaleKey)
-          pixelate.setValue(CIVector(x: frameImage.extent.midX, y: frameImage.extent.midY), forKey: kCIInputCenterKey)
-            self.currentFrame = pixelate.outputImage!.cropped(to: frameImage.extent)
-
-          self.videoView.draw()
+        let currentTime = playerItemVideoOutput.itemTime(forHostTime: CACurrentMediaTime())
+        if playerItemVideoOutput.hasNewPixelBuffer(forItemTime: currentTime) ||  progress != oldProgress {
+            if let buffer = playerItemVideoOutput.copyPixelBuffer(forItemTime: currentTime, itemTimeForDisplay: nil) {
+                let frameImage = CIImage(cvImageBuffer: buffer)
+                
+                let pixelate = CIFilter(name: "CIPixellate")!
+                pixelate.setValue(frameImage, forKey: kCIInputImageKey)
+                pixelate.setValue(progress, forKey: kCIInputScaleKey)
+                pixelate.setValue(CIVector(x: frameImage.extent.midX, y: frameImage.extent.midY), forKey: kCIInputCenterKey)
+                self.currentFrame = pixelate.outputImage!.cropped(to: frameImage.extent)
+                
+                self.videoView.draw()
+                self.oldProgress = progress
+            }
         }
-      }
     }
     
     required init?(coder: NSCoder) {
